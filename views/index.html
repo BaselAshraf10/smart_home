@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="utf-8" />
+    <title>WebSocket Control</title>
+    <style>
+        /* إعداد تنسيقات عامة */
+        body {
+            font-family: 'Poppins', Arial, sans-serif;
+            background-color: #e3f2fd;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+        }
+
+        .container {
+            text-align: center;
+            padding: 20px;
+            background: #ffffff;
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            box-shadow: 0 6px 10px rgba(0, 0, 0, 0.1);
+            display: none;
+            width: 90%;
+            max-width: 500px;
+        }
+
+        /* تنسيق أزرار التحكم */
+        #mybtn1, #mybtn2 {
+            width: 150px;
+            height: 50px;
+            margin: 10px;
+            color: white;
+            border: none;
+            border-radius: 25px;
+            background-color: red;
+            cursor: pointer;
+            font-size: 18px;
+            font-weight: bold;
+            transition: background-color 0.3s, transform 0.2s;
+        }
+
+        #mybtn1:hover, #mybtn2:hover {
+            transform: scale(1.05);
+        }
+
+        /* إشعارات */
+        #notification1, #notification2 {
+            margin-top: 20px;
+            padding: 10px 20px;
+            border-radius: 5px;
+            font-weight: bold;
+            font-size: 16px;
+            display: none;
+        }
+
+        #notification1 {
+            background-color: #ffcdd2;
+            color: #b71c1c;
+            border: 1px solid #b71c1c;
+        }
+
+        #notification2 {
+            background-color: #fff9c4;
+            color: #f57f17;
+            border: 1px solid #f57f17;
+        }
+
+        /* بيانات المستشعر */
+        #sensorData {
+            margin-top: 20px;
+            font-size: 20px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        #sensorValue {
+            font-size: 22px;
+            font-weight: bold;
+            color: black;
+        }
+
+        /* تنسيق شاشة تسجيل الدخول */
+        .login-container {
+            text-align: center;
+            padding: 20px;
+            background: #ffffff;
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            box-shadow: 0 6px 10px rgba(0, 0, 0, 0.1);
+            width: 90%;
+            max-width: 400px;
+        }
+
+        .login-container input {
+            width: 90%;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+
+        .login-container button {
+            width: 100%;
+            padding: 10px;
+            color: white;
+            background-color: #1e88e5;
+            border: none;
+            border-radius: 5px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        .login-container button:hover {
+            background-color: #1565c0;
+        }
+
+        .error {
+            color: red;
+            font-size: 14px;
+            margin-top: 10px;
+        }
+
+        /* سجل النشاط */
+        #activityLog {
+            background-color: #f1f1f1;
+            border-left: 2px solid #ddd;
+            padding: 20px;
+            width: 28%;
+            height: 100vh;
+            overflow-y: scroll;
+            position: absolute;
+            right: 0;
+            top: 0;
+            display: none;
+        }
+
+        #activityLog h3 {
+            text-align: center;
+            font-size: 18px;
+            margin-bottom: 20px;
+        }
+
+        #activityLog ul {
+            list-style-type: none;
+            padding: 0;
+        }
+
+        #activityLog li {
+            margin: 10px 0;
+            font-size: 14px;
+            color: #333;
+        }
+
+        /* Media Queries */
+        @media (max-width: 768px) {
+            #activityLog {
+                position: static;
+                width: 100%;
+                height: 50vh;
+                overflow-y: auto;
+                margin-top: 20px;
+            }
+
+            .container {
+                width: 100%;
+            }
+
+            #mybtn1, #mybtn2 {
+                width: 100%;
+                height: 60px;
+                font-size: 18px;
+            }
+
+            #sensorData {
+                font-size: 20px;
+            }
+
+            #sensorValue {
+                font-size: 24px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <!-- واجهة تسجيل الدخول -->
+    <div class="login-container" id="loginContainer">
+        <h2>Login</h2>
+        <input type="text" id="username" placeholder="Enter your username" />
+        <button id="loginButton">Login</button>
+        <div class="error" id="errorMessage"></div>
+    </div>
+
+    <!-- واجهة التحكم -->
+    <div class="container" id="controlContainer">
+        <h2 id="welcomeMessage"></h2> <!-- رسالة الترحيب -->
+        <button id="mybtn1">LED1</button>
+        <button id="mybtn2">LED2</button>
+        <div id="notification1">Fire detected and all doors open!</div>
+        <div id="notification2">Gas leak detected!</div>
+        <div id="sensorData">MQ2 Sensor Data: <span id="sensorValue">0</span></div>
+    </div>
+
+    <!-- سجل النشاط -->
+    <div id="activityLog">
+        <h3>Activity Log</h3>
+        <ul id="logList">
+            <!-- سيتم تحديث السجل هنا -->
+        </ul>
+    </div>
+
+    <script>
+        // طلب إذن لعرض الإشعارات عند تحميل الصفحة
+        window.onload = function() {
+            if (Notification.permission !== 'granted') {
+                Notification.requestPermission().then(function(permission) {
+                    if (permission === 'granted') {
+                        console.log('Notification permission granted');
+                    } else {
+                        console.log('Notification permission denied');
+                    }
+                });
+            } else {
+                console.log('Notification permission already granted');
+            }
+        };
+    
+        // أسماء المستخدمين المسموح لهم
+        const allowedUsers = ["basel", "ahmed", "youssef", "saif m", "saifs", "dr sanaa"];
+    
+        const loginContainer = document.getElementById("loginContainer");
+        const controlContainer = document.getElementById("controlContainer");
+        const loginButton = document.getElementById("loginButton");
+        const usernameInput = document.getElementById("username");
+        const errorMessage = document.getElementById("errorMessage");
+        const welcomeMessage = document.getElementById("welcomeMessage");
+        const logList = document.getElementById("logList");
+        const activityLog = document.getElementById("activityLog");
+    
+        let currentUser = '';
+        let fireAlertShown = false; // لتتبع إشعار الحريق
+        let gasAlertShown = false;  // لتتبع إشعار الغاز
+    
+        // التحقق من تسجيل الدخول
+        loginButton.onclick = function () {
+            const username = usernameInput.value.trim().toLowerCase();
+    
+            if (allowedUsers.includes(username)) {
+                currentUser = username; // تعيين المستخدم الحالي
+                loginContainer.style.display = "none"; // إخفاء واجهة تسجيل الدخول
+                controlContainer.style.display = "block"; // عرض واجهة التحكم
+                activityLog.style.display = "block";  // عرض سجل النشاط بعد تسجيل الدخول
+    
+                // عرض الرسالة الترحيبية
+                welcomeMessage.textContent = `Welcome to your smart home, ${currentUser}!`;
+            } else {
+                errorMessage.textContent = "Invalid username. Please try again.";
+            }
+        };
+    
+        // إضافة سجل النشاط
+        function addToActivityLog(message) {
+            const logItem = document.createElement('li');
+            logItem.textContent = `${new Date().toLocaleTimeString()} - ${currentUser}: ${message}`;
+    
+            logList.appendChild(logItem);
+        }
+    
+        // WebSocket functionality
+        var HOST = location.origin.replace(/^http/, 'ws');
+        var ws = new WebSocket(HOST);
+    
+        var button1 = document.getElementById("mybtn1");
+        var button2 = document.getElementById("mybtn2");
+        var notification1 = document.getElementById("notification1");
+        var notification2 = document.getElementById("notification2");
+        var sensorValueElement = document.getElementById("sensorValue");
+    
+        button1.onclick = function () {
+            if (this.style.backgroundColor === "red") {
+                ws.send("LED1off");
+                addToActivityLog("LED1 turned ON");
+            } else {
+                ws.send("LED1on");
+                addToActivityLog("LED1 turned OFF");
+            }
+        };
+    
+        button2.onclick = function () {
+            if (this.style.backgroundColor === "red") {
+                ws.send("LED2off");
+                addToActivityLog("LED2 turned ON");
+            } else {
+                ws.send("LED2on");
+                addToActivityLog("LED2 turned OFF");
+            }
+        };
+    
+        ws.onmessage = function (event) {
+            var msg = event.data;
+    
+            if (msg === "LED1on") {
+                button1.style.backgroundColor = "red";
+            } else if (msg === "LED1off") {
+                button1.style.backgroundColor = "green";
+            } else if (msg === "LED2on") {
+                button2.style.backgroundColor = "red";
+            } else if (msg === "LED2off") {
+                button2.style.backgroundColor = "green";
+            }
+    
+            // التحقق من وجود حريق
+            if (msg.includes("Fire detected!") && !fireAlertShown) {
+                notification1.style.display = "block";
+                addToActivityLog("Fire detected!");
+                fireAlertShown = true;
+    
+                // عرض إشعار حقيقي عند اكتشاف حريق
+                if (Notification.permission === 'granted') {
+                    new Notification('Warning: Fire Detected!', {
+                        body: 'A fire has been detected in your Home!',
+                        
+                        tag: 'fire-alert'
+                    });
+                }
+            } else if (!msg.includes("Fire detected!") && fireAlertShown) {
+                notification1.style.display = "none";
+                fireAlertShown = false;
+            }
+    
+            // التحقق من تسريب الغاز
+            if (msg.startsWith("MQ2 Value:")) {
+                var sensorData = msg.split(":")[1];
+                sensorValueElement.innerText = sensorData;
+    
+                if (sensorData > 105 && !gasAlertShown) {
+                    notification2.style.display = "block";
+                    addToActivityLog("Gas leak detected!");
+                    sensorValueElement.style.color = "red";
+                    gasAlertShown = true;
+    
+                    // عرض إشعار حقيقي عند اكتشاف تسريب غاز
+                    if (Notification.permission === 'granted') {
+                        new Notification('Warning: Gas Leak Detected!', {
+                            body: 'A gas leak has been detected in your environment!',
+                           
+                            tag: 'gas-leak-alert'
+                        });
+                    }
+                } else if (sensorData <= 105) {
+                    notification2.style.display = "none";
+                    gasAlertShown = false;
+                    sensorValueElement.style.color = "black";
+                }
+            }
+        };
+    
+        ws.onopen = function () {
+            console.log("Connected to server");
+        };
+    
+        ws.onclose = function () {
+            console.log("Disconnected from server!");
+        };
+    </script>
+    
+        
+</body>
+
+</html>
